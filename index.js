@@ -33,3 +33,23 @@ const pm2log4 = io.metric({
 const pm2log5 = io.metric({
 	name: 'Last Used',
 })
+// 
+
+function updateCommand() {
+	const commands = [];
+	const commandFolders = fs.readdirSync('./commands');
+	for (const folder of commandFolders) {
+		const commandFiles = fs.readdirSync(`./commands/${folder}`).filter(file => file.endsWith('.js'));
+		for (const file of commandFiles) {
+			try {
+				const command = require(`./commands/${folder}/${file}`);
+				client.commands.set(command.data.name, command);
+			}
+			catch (error) {
+				console.log(`Error occurred while registering: ${file} command. Error: ${error}`);
+			}
+		}
+	}
+	return commands;
+}
+
