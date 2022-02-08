@@ -108,3 +108,16 @@ async function permissionHandler(interaction, command) {
 		access_logger(interaction, "CMD");
 	}
 }
+
+updateCommand();
+client.once('ready', async () => {
+	client.user.setPresence({
+		status: 'online',
+		activities: [{ name: 'deltahacks.com | /help' }]
+	});
+	append_to_file(
+		"logs/access.txt",
+		`-------------------------------------\n${getTime()} : Bot started\n-------------------------------------\n`
+	);
+	console.log('Ready!');
+});
