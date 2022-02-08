@@ -53,3 +53,58 @@ function updateCommand() {
 	return commands;
 }
 
+async function permissionHandler(interaction, command) {
+	const roleIds = []
+	const channelIds = []
+
+	if (!interaction.inGuild() && command.permissions["dm"]) {
+		await command.execute(interaction, client)
+		access_logger(interaction, "DM");
+		return
+	} else if (!interaction.inGuild()) {
+		await interaction.reply({ content: 'You cannot use this command in a DM.', ephemeral: true });
+		return
+	}
+	for (let role of command.permissions.roles) {
+		if (config.allRoles[role] === "Master") {
+			config.allRoles.Master.forEach((item) => roleIds.push(config.allRoles[item]));
+		}
+		else if (config.allRoles[role]) {
+			roleIds.push(config.allRoles[role])
+		}
+	}
+
+	for (let channel of command.permissions.channel) {
+		if (config.allChannels[channel]) {
+			channelIds.push(config.allChannels[channel])
+		}
+	}
+
+	if (!interaction.member._roles.some(e => roleIds.includes(e)) && command.permissions.roles.length > 0) {
+		await interaction.reply({ content: 'You are not allowed to use this command', ephemeral: true });
+		access_logger(interaction, "Perm");
+	} else if (command.permissions.channel.length === 1 && command.permissions.dm === true) {
+		await interaction.reply({ content: 'This command can only be used via DMs.', ephemeral: true });
+	}
+	else if (!channelIds.includes(interaction.channel.id) && command.permissions.channel.length > 0) {
+		let channelstring = "";
+		for (let channel of command.permissions.channel) {
+			channelstring += `<#${config.allChannels[channel]}>, `
+		}
+		channelstring = channelstring.slice(0, -2);
+		await interaction.reply({ content: `You cannot use this command in this channel.\n Try using it in the following channels: ${channelstring}`, ephemeral: true });
+	}
+	else if (rateLimiter.take(interaction.user.id) && !is_Rate_Limit_Excused(interaction.member)) {
+		await interaction.reply({ content: `Hey, you're doing doing that too often, please try again later!`, ephemeral: true });
+	} else {
+		if (command.data.name === "dh-config") {
+			config = await command.execute(interaction, client);
+			updateCommand();
+			updateRateLimiter();
+		}
+		else {
+			await command.execute(interaction, client);
+		}
+		access_logger(interaction, "CMD");
+	}
+}
