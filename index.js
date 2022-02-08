@@ -154,6 +154,45 @@ client.on('interactionCreate', async interaction => {
 
 client.login(config.token);
 
+// ------------------- Logging --------------------------
+function access_logger(interaction, type) {
+	globalstats.access_counter += 1;
+	globalstats.last_used = getTime();
+	let statement = "";
+	switch (type) {
+		case "DM":
+			statement = `Ran command: "${interaction.commandName}", by: ${interaction.user.tag}, in DMs`;
+			globalstats.DMs += 1;
+			break;
+		case "Perm":
+			statement = `Insufficient permission to run: ${interaction.commandName}, in: <#${interaction.channelId}>, by: ${interaction.user.tag}`;
+			break;
+		case "CMD":
+			statement = `Ran command: "${interaction.commandName}", by: ${interaction.user.tag}, in channel: <#${interaction.channelId}>`;
+			globalstats.CMDs += 1;
+			break;
+		case "Rate":
+			statement = `Rate Limited: [${interaction.user.tag},${interaction.user.username}]. Last command attempt: ${interaction.commandName} in <#${interaction.channelId}>`;
+			globalstats.rate_limits += 1;
+			break;
+	}
+	if (config.logging.Discord_Log_Messages) {
+		client.channels.cache
+			.get(config.logging.Logging_Channel)
+			.send(`${getTime()} : ${globalstats.access_counter} : ${statement}`);
+	}
+	if (config.logging.Console_Log_Messages) {
+		console.log(`${getTime()} : ${globalstats.access_counter} : ${statement}`);
+	}
+	if (config.logging.File_Log_Messages)
+		append_to_file(
+			"logs/access.txt",
+			`${getTime()} : ${globalstats.access_counter} : ${statement}\n`
+		);
+	// pm2Counter.set(access_counter);
+	updateStats();
+}
+
 function error_logger(error) {
 	console.log("Error: " + error);
 	append_to_file(
