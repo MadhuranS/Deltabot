@@ -153,3 +153,58 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(config.token);
+
+function error_logger(error) {
+	console.log("Error: " + error);
+	append_to_file(
+		"logs/error.txt",
+		`${getTime()} : ${error}\n-------------------------------------\n`
+	);
+	globalstats.errors_encountered += 1;
+	updateStats();
+}
+
+async function append_to_file(filename, message) {
+	var stream = fs.createWriteStream(filename, { flags: "a" });
+	stream.write(message);
+	stream.end();
+}
+
+function updateStats() {
+	fs.writeFile("./logs/stats.json", JSON.stringify(globalstats), { encoding: 'utf8' }, function (err) {
+		if (err) {
+			return console.log(err);
+		}
+	});
+	pm2log1.set(globalstats.access_counter);
+	pm2log2.set(globalstats.errors_encountered);
+	pm2log3.set(globalstats.DMs);
+	pm2log4.set(globalstats.CMDs);
+	pm2log5.set(globalstats.last_used);
+}
+
+function getTime() {
+	var dateTime = new Date().toLocaleString('en-US', { timeZone: 'EST' });
+	return dateTime;
+}
+
+
+function updateRateLimiter() {
+	rateLimiter = new RateLimiter(
+		config.rate_limit.Messages,
+		config.rate_limit.Per_millisecond
+	);
+}
+
+function is_Rate_Limit_Excused(author) {
+	let excused_role_id = new Set();
+	config.allRoles.RateLimitExcused.forEach((item) =>
+		excused_role_id.add(config.allRoles[item])
+	);
+	for (const [key, value] of author.roles.cache.entries()) {
+		if (excused_role_id.has(key)) {
+			return true;
+		}
+	}
+	return false;
+}
