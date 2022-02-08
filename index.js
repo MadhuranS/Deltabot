@@ -121,3 +121,20 @@ client.once('ready', async () => {
 	);
 	console.log('Ready!');
 });
+
+client.on("messageCreate", (message) => {
+	if (
+		message.mentions.members != undefined &&
+		message.mentions.members.has(client.user.id)
+	) {
+		const emoji = client.emojis.cache.find(emoji => emoji.name === "deltahacks");
+		if (message.content.toLowerCase().includes("good bot")) {
+			message.channel.send(`01010100 01101000 01100101 00100000 01001000 01100001 01100011 01101011 01100001 01110100 01101000 01101111 01101110 00100000 01100110 01101111 01110010 00100000 01000011 01101000 01100001 01101110 01100111 01100101 ${emoji}`);
+			return;
+		}
+		message.channel.send(
+			"Did someone call me? Use /help if you need help 👀"
+		);
+		return;
+	}
+});
