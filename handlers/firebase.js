@@ -48,4 +48,61 @@ module.exports = {
       await interaction.editReply(statement);
     }
   },
+  getCodes: async function getCodes(interaction, category) {
+    let available = ["judges", "mentors", "sponsors"];
+
+    if (category === undefined || category.trim() === "") {
+      interaction.editReply(
+        "Category not provided. Usage: /dh-getcodes <category>"
+      );
+      return;
+    }
+    category = category.toLowerCase();
+    if (!available.includes(category)) {
+      interaction.editReply(
+        "Invalid category sent. You should know the categories!"
+      );
+      return;
+    }
+
+    try {
+      let allDocs = await db
+        .collection(bucket)
+        .doc("hackathon")
+        .collection(category)
+        .get();
+      let res = [];
+      let name = category.charAt(0).toUpperCase() + category.substring(1);
+      res.push(`${name} codes: \n`);
+      for (let doc of allDocs.docs) {
+        let data = doc.data();
+        if (!data.code) res.push(`${doc.id}: No Code\n`);
+        else {
+          let codedoc = await db.collection(bucket).doc('hackathon').collection('codes').doc(data.code).get();
+          if (!codedoc.exists || codedoc.data().activated) continue
+          res.push(
+            `${data.name.first} ${data.name.last} (${doc.id}): ${data.code}\n`
+          );
+        }
+      }
+
+      res.push(
+        "\n\nPLEASE BE CAUTIOUS WHEN USING THE COMMAND. DO NOT GIVE SOMEBODY THE WRONG CODE!"
+      );
+      let fullMessage = res.join("");
+      if (fullMessage.length > 2000) {
+        console.log("Too many codes to send")
+        interaction.editReply(fullMessage.substring(2000))
+        return
+      }
+      else interaction.editReply(res.join(""));
+      return;
+    } catch (e) {
+      console.log(e);
+      interaction.editReply(
+        "The category has no registered users or something went really wrong."
+      );
+      return;
+    }
+  },
 }
