@@ -10,6 +10,75 @@ const db = admin.firestore();
 const Discord = require("discord.js");
 
 module.exports = {
+  register: async function registration(interaction, inpcode, client) {
+    let server = await client.guilds
+      .fetch(config.guildId)
+      .then((server) => server)
+      .catch(console.error);
+    const hasRegisteredRole = await isAlreadyRegisteredRole(interaction, server);
+    if (hasRegisteredRole) {
+      sendAlreadyRegisteredDM(interaction, server);
+      return;
+    }
+    if (
+      inpcode === undefined ||
+      inpcode.trim() === "" ||
+      inpcode.trim().length != 9
+    ) {
+      sendCodeInvalidDM(interaction, server);
+      return;
+    }
+    inpcode = inpcode.trim().toUpperCase();
+    const codes_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("codes")
+      .doc(inpcode);
+    const author = interaction.user.id
+    codes_db
+      .get()
+      .then(function (code_doc) {
+        if (code_doc.exists) {
+          // Code exists in Firebase
+          if (code_doc.data().activated) {
+            //Check if user is already activated
+            if (code_doc.data().discord_id == author) {
+              // User activated is the caller
+              sendAlreadyRegisteredDM(interaction, server);
+              assignRole(author, server, config.allRoles.Hacker);
+              return;
+            } else {
+              // Token has been used by someone who's not the caller
+              sendTokenUsedDM(interaction, server);
+              return;
+            }
+          } else {
+            // User is not activated
+            codes_db.set(
+              {
+                username: `${interaction.user.username}#${interaction.user.discriminator}`,
+                activated: true,
+                discord_id: author,
+              },
+              { merge: true }
+            );
+            check_in_firebase(interaction, code_doc.data().email, inpcode);
+            sendCompletionDM(interaction, server);
+            let role_name = code_doc.data().type;
+            role_name = role_name.charAt(0).toUpperCase() + role_name.slice(1);
+            const role_id = config.allRoles[role_name];
+            assignRole(author, server, role_id);
+            return;
+          }
+        } else {
+          // Code entered is not available in Firebase
+          sendCodeInvalidDM(interaction, server);
+        }
+      })
+      .catch(function (error) {
+        console.log("Error getting document:", error);
+      });
+  },
   find: async function find(interaction, data) {
     const snapshot = await db
       .collection(bucket)
