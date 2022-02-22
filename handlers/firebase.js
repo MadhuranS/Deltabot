@@ -141,6 +141,46 @@ module.exports = {
         console.log("Error getting document:", error);
       });
   },
+  create_ticket: async function create_ticket(interaction, issue, client) {
+    let server = await client.guilds
+      .fetch(config.guildId)
+      .then((server) => server)
+      .catch(console.error);
+    let ticket_code = getRandomCode();
+    const support_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("support");
+    support_db
+      .doc("manager")
+      .get()
+      .then(function (support_doc) {
+        let pending = support_doc.data().pending;
+        let resolving = support_doc.data().resolving;
+        let resolved = support_doc.data().resolved;
+        while (
+          pending.includes(ticket_code) ||
+          resolving.includes(ticket_code) ||
+          resolved.includes(ticket_code)
+        ) {
+          ticket_code = getRandomCode();
+        }
+        pending.push(ticket_code);
+        support_db.doc(ticket_code).set({
+          caller: `${interaction.user.username}#${interaction.user.discriminator}`,
+          status: "pending",
+          issue: issue,
+          discord_id: interaction.user.id,
+        });
+        support_db.doc("manager").update({
+          pending: pending,
+        });
+        sendSupportTicket(interaction, ticket_code, issue, server, client);
+      })
+      .catch(function (error) {
+        console.log("Error getting document:", error);
+      });
+  },
   find: async function find(interaction, data) {
     const snapshot = await db
       .collection(bucket)
