@@ -252,6 +252,192 @@ module.exports = {
         console.log("Error getting document:", error);
       });
   },
+  resolve: async function resolve_ticket(interaction, ticket_code, resolution) {
+    const support_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("support");
+    support_db
+      .doc("manager")
+      .get()
+      .then(function (support_doc) {
+        ticket_code = ticket_code.toString().trim();
+        let pending = support_doc.data().pending;
+        let resolving = support_doc.data().resolving;
+        let resolved = support_doc.data().resolved;
+        if (resolved.includes(ticket_code)) {
+          interaction.editReply(
+            "The ticket:" + ticket_code + " has already been resolved."
+          );
+          return;
+        }
+        if (
+          !pending.includes(ticket_code) &&
+          !resolving.includes(ticket_code) &&
+          !resolved.includes(ticket_code)
+        ) {
+          interaction.editReply(
+            "The ticket: " + ticket_code + " does not exist."
+          );
+          return;
+        }
+        pending = pending.filter((item) => item !== ticket_code);
+        resolving = resolving.filter((item) => item !== ticket_code);
+        resolved.push(ticket_code);
+        support_db.doc(ticket_code).update(
+          {
+            assigned_to: `${interaction.member.user.username}#${interaction.member.user.discriminator}`,
+            status: "resolved",
+            resolution: resolution,
+          },
+          { merge: true }
+        );
+        support_db.doc("manager").update({
+          pending: pending,
+          resolving: resolving,
+          resolved: resolved,
+        });
+        sendResolvedMessage(interaction, ticket_code, resolution);
+      })
+      .catch(function (error) {
+        console.log("Error getting document:", error);
+      });
+  },
+  view_ticket: async function view_ticket(interaction, ticket_code, user) {
+    const support_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("support");
+    if (ticket_code == null) {
+      if (user != null) {
+        let tickets = { "in progress": [], "resolved": [] };
+        let found = false;
+        const snapshot = await support_db.get();
+        snapshot.forEach((doc) => {
+          if (
+            doc.id != "manager" &&
+            doc.data().assigned_to != undefined &&
+            doc.data().assigned_to === `${user.username}#${user.discriminator}`
+          ) {
+            tickets[doc.data().status].push(doc.id);
+            found = true;
+          }
+        });
+        if (!found) {
+          interaction.editReply("No tickets assigned to: @" + user.tag);
+          return;
+        }
+        else {
+          interaction.editReply(`Tickets assigned to: @${user.tag}\nOpen - ${(tickets["in progress"]).length} :\n${tickets["in progress"].join("\n")}\n\nResolved - ${(tickets["resolved"]).length} :\n${tickets["resolved"].join("\n")}`);
+          return;
+        }
+      } else {
+        support_db
+          .doc("manager")
+          .get()
+          .then(function (support_doc) {
+            let pending = support_doc.data().pending;
+            let len1 = 0;
+            let len2 = 0;
+            let len3 = 0;
+            if (pending.length == 0) {
+              pending = ["None"];
+            } else {
+              len1 = pending.length;
+              pending = pending.slice(0, 3);
+              if (len1 > 3) {
+                let len = len1 - 3;
+                pending.push("And " + len + " more ...");
+              }
+            }
+            let resolving = support_doc.data().resolving;
+            if (resolving.length == 0) {
+              resolving = ["None"];
+            } else {
+              len2 = resolving.length;
+              resolving = resolving.slice(0, 3);
+              if (len2 > 3) {
+                let len = len2 - 3;
+                resolving.push("And " + len + " more ...");
+              }
+            }
+            let resolved = support_doc.data().resolved;
+            if (resolved.length == 0) {
+              resolved = ["None"];
+            } else {
+              len3 = resolved.length;
+              resolved = resolved.slice(0, 3);
+              if (len3 > 3) {
+                let len = len3 - 3;
+                resolved.push("And " + len + " more ...");
+              }
+            }
+            const Embed = new Discord.MessageEmbed()
+              .setTitle("Support Ticket Status")
+              .setDescription(`Current Status for Live Support Desk`)
+              .addField("Pending: " + len1.toString(), pending.toString())
+              .addField("Resolving: " + len2.toString(), resolving.toString())
+              .addField("Resolved: " + len3.toString(), resolved.toString())
+              .setColor("#d34993")
+              .setThumbnail(interaction.guild.iconURL());
+            interaction.editReply({ embeds: [Embed] });
+          })
+          .catch(function (error) {
+            console.log("Error getting document:", error);
+          });
+      }
+    } else {
+      ticket_code = ticket_code.toString().trim();
+      support_db
+        .doc(ticket_code)
+        .get()
+        .then(function (ticket_doc) {
+          assigned = ticket_doc.data().assigned_to;
+          if (assigned == undefined) {
+            assigned = "Not assigned to anyone"
+          }
+          resolution = ticket_doc.data().resolution;
+          if (resolution == undefined) {
+            resolution = "Not resolved yet"
+          }
+          const Embed = new Discord.MessageEmbed()
+            .setTitle("Support Ticket Status")
+            .setDescription(`Status for Ticket`)
+            .addField("Ticket Number", ticket_code)
+            .addField("Requester", `<@${ticket_doc.data().discord_id}>`)
+            .addField("Status", ticket_doc.data().status)
+            .addField("Assigned To", assigned)
+            .addField("Issue", ticket_doc.data().issue)
+            .addField("Resolution", resolution)
+            .setColor("#d34993")
+            .setThumbnail(interaction.guild.iconURL());
+          interaction.editReply({ embeds: [Embed] });
+        })
+        .catch(function (error) {
+          interaction.editReply(
+            "The ticket: " + ticket_code + " does not exist."
+          );
+        });
+    }
+  },
+  reset_support: async function reset_support(interaction) {
+    const support_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("support");
+    deleteCollection(db, support_db, 500).then((result) => {
+      if (result) {
+        support_db.doc("manager").set({
+          pending: [],
+          resolving: [],
+          resolved: [],
+        });
+        interaction.editReply("Support Reset");
+      } else {
+        reset_support(interaction);
+      }
+    });
+  },
   find: async function find(interaction, data) {
     const snapshot = await db
       .collection(bucket)
