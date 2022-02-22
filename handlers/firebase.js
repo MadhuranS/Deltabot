@@ -181,6 +181,77 @@ module.exports = {
         console.log("Error getting document:", error);
       });
   },
+  open_ticket: async function open_ticket(interaction, ticket_code) {
+    const support_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("support");
+    support_db
+      .doc("manager")
+      .get()
+      .then(function (support_doc) {
+        let pending = support_doc.data().pending;
+        let resolving = support_doc.data().resolving;
+        let resolved = support_doc.data().resolved;
+        if (ticket_code != null) {
+          ticket_code = ticket_code.toString().trim();
+        } else {
+          ticket_code = pending[0];
+          if (pending.length == 0) {
+            interaction.editReply("No tickets to resolve!");
+            return;
+          }
+        }
+        if (
+          !pending.includes(ticket_code) &&
+          !resolving.includes(ticket_code) &&
+          !resolved.includes(ticket_code)
+        ) {
+          interaction.editReply(
+            "The ticket: " + ticket_code + " does not exist."
+          );
+          return;
+        }
+        if (resolving.includes(ticket_code)) {
+          interaction.editReply(
+            "The ticket:" + ticket_code + " is already open."
+          );
+          return;
+        }
+        pending = pending.filter((item) => item !== ticket_code);
+        resolved = resolved.filter((item) => item !== ticket_code);
+        resolving.push(ticket_code);
+        support_db.doc(ticket_code).update(
+          {
+            assigned_to: `${interaction.member.user.username}#${interaction.member.user.discriminator}`,
+            status: "in progress",
+          },
+          { merge: true }
+        );
+        support_db.doc("manager").update({
+          pending: pending,
+          resolving: resolving,
+          resolved: resolved,
+        });
+        support_db
+          .doc(ticket_code)
+          .get()
+          .then(function (ticket_doc) {
+            let requester = ticket_doc.data().discord_id;
+            let issue = ticket_doc.data().issue;
+            sendOpenedTicket(interaction, ticket_code, issue, requester);
+          })
+          .catch(function (error) {
+            interaction.editReply(
+              "The ticket: " + ticket_code + " does not exist."
+            );
+            return;
+          });
+      })
+      .catch(function (error) {
+        console.log("Error getting document:", error);
+      });
+  },
   find: async function find(interaction, data) {
     const snapshot = await db
       .collection(bucket)
