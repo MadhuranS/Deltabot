@@ -79,6 +79,68 @@ module.exports = {
         console.log("Error getting document:", error);
       });
   },
+  reset_registration: async function reset_registration(
+    interaction,
+    inpcode,
+    inp_email
+  ) {
+    if (
+      inpcode === undefined ||
+      inpcode.trim() === "" ||
+      inpcode.trim().length != 9
+    ) {
+      interaction.editReply("Invalid code. Please fix format.");
+      return;
+    }
+    if (inp_email === undefined || inp_email.trim() === "") {
+      interaction.editReply("Invalid email. Please fix format.");
+      return;
+    }
+    inpcode = inpcode.trim().toUpperCase();
+    inp_email = inp_email.trim().toLowerCase();
+    const codes_db = db
+      .collection(bucket)
+      .doc("hackathon")
+      .collection("codes")
+      .doc(inpcode);
+    codes_db
+      .get()
+      .then(function (code_doc) {
+        if (code_doc.exists) {
+          // Code exists in Firebase
+          if (code_doc.data().activated) {
+            //Check if user is already activated
+            if (code_doc.data().email.trim().toLowerCase() == inp_email) {
+              removeAllRoles(interaction, code_doc.data().discord_id);
+              codes_db.set(
+                {
+                  username: null,
+                  activated: false,
+                  discord_id: null,
+                },
+                { merge: true }
+              );
+              check_out_firebase(code_doc.data().email);
+              interaction.editReply("Code is ready to be used again, removed all user roles");
+            } else {
+              interaction.editReply(
+                "Email entered is invalid. This code was assigned to: " +
+                code_doc.data().email
+              );
+            }
+          } else {
+            // User is not activated
+            interaction.editReply("Code is not activated.");
+          }
+        } else {
+          interaction.editReply("The code " + inpcode + " does not exist.");
+        }
+      })
+      .catch(function (error) {
+        // message.channel.send("This ticket: " + ticket_code + " does not exist.");
+        console.log("Error getting document:", error);
+      });
+  },
   find: async function find(interaction, data) {
     const snapshot = await db
       .collection(bucket)
