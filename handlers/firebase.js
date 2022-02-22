@@ -532,5 +532,195 @@ module.exports = {
       );
       return;
     }
-  },
+  }, 
 }
+
+
+function sendAlreadyRegisteredDM(interaction, server) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("You are already registered")
+    .setDescription(
+      `Hey ${interaction.user.username}, you're already registered on the ${server.name} server. Cheers!`
+    )
+    .setColor("#d34993")
+    .setThumbnail(server.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function sendCompletionDM(interaction, server) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("Registration complete")
+    .setDescription(
+      `Hey ${interaction.user.username}, you're now registered on the ${server.name} server. You should be able to see the channels on the ${server} server.`
+    )
+    .setColor("#d34993")
+    .setThumbnail(server.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function sendTokenUsedDM(interaction, server) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("Token already used")
+    .setDescription(
+      `Hey ${interaction.user.username}. The code you entered for registration on ${server.name} server has already been used.\n Please register yourself by using "/register <your_unique_code>" or contact #support on the server for more information.`
+    )
+    .setColor("#d34993")
+    .setThumbnail(server.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function sendCodeInvalidDM(interaction, server) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("Invalid Code")
+    .setDescription(
+      `Hey ${interaction.user.username}. The code you entered for registration on ${server.name} server is invalid.\n Please register yourself by using "/register <your_unique_code>" or contact #support on the server for more information.`
+    )
+    .setColor("#d34993")
+    .setThumbnail(server.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function sendSupportTicket(interaction, ticket, issue, server, client) {
+  const Embed1 = new Discord.MessageEmbed()
+    .setTitle("Support Ticket Created")
+    .setDescription(
+      `Hey ${interaction.user.username}, a support ticket has been generated for you. Someone from our support team will get back to you ASAP.`
+    )
+    .addField("Ticket Number", ticket)
+    .addField("Request", issue)
+    .setColor("#d34993");
+  interaction.editReply({ embeds: [Embed1] });
+  const Embed2 = new Discord.MessageEmbed()
+    .setTitle("Support Requested")
+    .setDescription(
+      `A support ticket has been created. Please use the following commands for resolution:\n/dh-view ticket:${ticket} : To view the ticket\n/dh-open ${ticket} : To assign ticket to yourself\n/dh-resolve ticket:${ticket} resolution: <resolution message> : To resolve ticket\n/dh-dm user:${client.users.cache.get(interaction.user.id)} content:<message> : To DM the requester`
+    )
+    .addField("Ticket Number", ticket)
+    .addField("Issue/Request", issue)
+    .addField("Requester", `${interaction.user.username}#${interaction.user.discriminator}`)
+    .setColor("#d34993");
+  server.channels.cache.get(config.logging.Support).send({ embeds: [Embed2] });
+}
+
+function sendOpenedTicket(interaction, ticket, issue, requester) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("Support Ticket : In Progress")
+    .setDescription(`Support ticket now in progress`)
+    .addField("Ticket Number", `${ticket}`)
+    .addField("Requester", `<@${requester}>`)
+    .addField("Issue", `${issue}`)
+    .addField("Assigned To", `${interaction.member.user.username}`)
+    .setColor("#d34993")
+    .setThumbnail(interaction.guild.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function sendResolvedMessage(interaction, ticket, resolution) {
+  const Embed = new Discord.MessageEmbed()
+    .setTitle("Support Ticket : Resolved")
+    .setDescription(`Support ticket is now resolved.`)
+    .addField("Ticket Number", `${ticket}`)
+    .addField("Resolved By", `${interaction.member.user.username}`)
+    .addField("Solution", `${resolution}`)
+    .setColor("#d34993")
+    .setThumbnail(interaction.guild.iconURL());
+  interaction.editReply({ embeds: [Embed] });
+}
+
+function assignRole(user_id, server, role_id) {
+  let role = server.roles.cache.find((guild) => guild.id === role_id);
+  let registeredRole = server.roles.cache.find(
+    (guild) => guild.id === config.allRoles.Registered
+  );
+  if (role === undefined || registeredRole === undefined) {
+    console.log("Role does not exist");
+  } else {
+    server.members
+      .fetch(user_id)
+      .then((member) => {
+        member.roles.add(role);
+        member.roles.add(registeredRole);
+      })
+      .catch(console.error);
+  }
+}
+
+const removeAllRoles = async (interaction, user) => {
+  res = await interaction.guild.members.fetch({ user, cache: false });
+  mem = await res.fetch(true);
+  mem.roles.remove(mem.roles.cache);
+};
+
+function check_in_firebase(interaction, email, code) {
+  const checked_in_db = db
+    .collection(bucket)
+    .doc("hackathon")
+    .collection("checked in");
+  checked_in_db.doc(email).set(
+    {
+      username: `${interaction.user.username}#${interaction.user.discriminator}`,
+      discord_id: interaction.user.id,
+      code_used: code,
+    },
+    { merge: true }
+  );
+}
+
+function check_out_firebase(email) {
+  const checked_in_db = db
+    .collection(bucket)
+    .doc("hackathon")
+    .collection("checked in");
+  checked_in_db.doc(email).delete();
+}
+
+function getRandomCode() {
+  min = 10000000;
+  max = 99999999;
+  return Math.floor(Math.random() * (max - min) + min).toString(); //The maximum is exclusive and the minimum is inclusive
+}
+
+const isAlreadyRegisteredRole = async (interaction, client) => {
+  let role = client.roles.cache.find(
+    (guild) => guild.id === config.allRoles.Registered
+  );
+  const user = interaction.user.id;
+  res = await client.members.fetch({ user, cache: false });
+  mem = await res.fetch(true);
+  if (mem.roles.cache.find((r) => r === role)) {
+    return true;
+  } else {
+    return false;
+  }
+};
+
+const deleteCollection = async (db, collectionPath, batchSize) => {
+  const collectionRef = collectionPath;
+  const query = collectionRef.orderBy("__name__").limit(batchSize);
+
+  const result = await deleteQueryBatch(db, query);
+  return result;
+};
+
+const deleteQueryBatch = async (db, query) => {
+  const snapshot = await query.get();
+
+  const batchSize = snapshot.size;
+  if (batchSize === 0) {
+    // When there are no documents left, we are done
+    return true;
+  }
+
+  // Delete documents in a batch
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  // Recurse on the next process tick, to avoid
+  // exploding the stack.
+  process.nextTick(() => {
+    deleteQueryBatch(db, query);
+  });
+};
